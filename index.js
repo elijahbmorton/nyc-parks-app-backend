@@ -1,0 +1,44 @@
+const express = require("express");
+const db = require("./db.js");
+const _Sequelize = require('sequelize');
+const Sequelize = _Sequelize.Sequelize;
+require('dotenv').config()
+
+// Env variables
+const PORT = process.env.PORT || 3000;
+
+// Db init
+(async () => {
+    try {
+        await db.init();
+        await db.testConnection();
+        await appInit();
+        process.on("uncaughtException", (err) => {
+            console.log("uncaughtException", err);
+        });
+    } catch (e) {
+        console.error('App startup error', e);
+        process.exit();
+    }
+})();
+
+async function appInit() {
+  // Start node
+  const app = express();
+
+  // Routers
+  app.use(express.json());
+  app.use('/api/auth', require("./routes/auth"));
+  app.use('/api/review', require("./routes/review"));
+  app.use('/api/user', require("./routes/user"));
+  app.use('/api/friend', require("./routes/friend"));
+
+  // Associations
+  const associations = require('./models/associations');
+  associations.createDbAssociations();
+
+  // Start app
+  app.listen(PORT, "0.0.0.0", async () => {
+    console.log(`connected at port ${PORT}`);
+  });
+}
