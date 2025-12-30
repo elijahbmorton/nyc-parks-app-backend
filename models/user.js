@@ -6,6 +6,7 @@ const sequelize = db.getSequelize();
 class User extends Model { }
 
 // https://www.backyardgardenlover.com/new-york-native-plants-list/
+// TODO: add Ironweed, Echinacea, Milkweed, Trumpet creeper, bee balm, culver's root
 
 User.init(
     {

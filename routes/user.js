@@ -50,7 +50,7 @@ userRouter.get("/userInfo", auth, async (req, res) => {
 });
 
 userRouter.post("/updateProfileImage", auth, async (req, res) => {
-    const { profileImageOptions } = req.body;
+    const { userId, profileImageOptions } = req.body;
 
     // JSON parse profileImageOptions
     let jsonProfileImageOptions;
@@ -64,7 +64,7 @@ userRouter.post("/updateProfileImage", auth, async (req, res) => {
     // Find user
     const user = await User.findOne({ 
         attributes: ['id', 'name', 'profileImage', 'createdAt'],
-        where: { id: req.query.userId },
+        where: { id: userId },
     });
     user.profileImage = profileImageOptions;
     user.save();
