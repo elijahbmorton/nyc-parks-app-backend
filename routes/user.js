@@ -20,13 +20,13 @@ userRouter.get("/userInfo", auth, async (req, res) => {
                 model: Friend,
                 as: 'friendOf',
                 required: false,
-                include: [{ model: User, as: 'friend', attributes: ['id', 'name', 'profileImage', 'createdAt'] }],
+                include: [{ model: User, as: 'user', attributes: ['id', 'name', 'profileImage', 'createdAt'] }],
             },
             {
                 model: Friend,
                 as: 'userOf',
                 required: false,
-                include: [{ model: User, as: 'user', attributes: ['id', 'name', 'profileImage', 'createdAt'] }],
+                include: [{ model: User, as: 'friend', attributes: ['id', 'name', 'profileImage', 'createdAt'] }],
             },
         ],
         where: { id: req.query.userId },
@@ -36,9 +36,13 @@ userRouter.get("/userInfo", auth, async (req, res) => {
     // Aggregate the two friend joins
     let friends = [];
     for (let friend of [...user.friendOf, ...user.userOf]) {
-        let parsedFriend = friend?.friend || friend.user;
-        parsedFriend.friendshipCreatedAt = friend.createdAt;
-        parsedFriend.friendRequestStatus = friend.status;
+        const parsedFriend = {
+            ...(friend?.friend || friend.user),
+            friendshipCreatedAt: friend.createdAt,
+            friendRequestStatus: friend.status,
+            userId: friend.userId,
+            friendId: friend.friendId,
+        }
         friends.push(parsedFriend);
     }
     user.friends = friends;
@@ -50,12 +54,12 @@ userRouter.get("/userInfo", auth, async (req, res) => {
 });
 
 userRouter.post("/updateProfileImage", auth, async (req, res) => {
-    const { userId, profileImageOptions } = req.body;
+    const { userId, profileImage } = req.body;
 
     // JSON parse profileImageOptions
     let jsonProfileImageOptions;
     try {
-        jsonProfileImageOptions = JSON.parse(profileImageOptions);
+        jsonProfileImageOptions = JSON.parse(profileImage);
     } catch (e) {
         res.status(500).json({ message: "Unable to update profile image, invalid option selected." });
         return;
@@ -66,7 +70,7 @@ userRouter.post("/updateProfileImage", auth, async (req, res) => {
         attributes: ['id', 'name', 'profileImage', 'createdAt'],
         where: { id: userId },
     });
-    user.profileImage = profileImageOptions;
+    user.profileImage = jsonProfileImageOptions;
     user.save();
 
     res.json({ message: "Successfully updated profile image" });

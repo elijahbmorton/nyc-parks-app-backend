@@ -1,31 +1,28 @@
 const express = require("express");
-const sequelize = require('sequelize');
+const { Op } = require('sequelize');
 
 const auth = require("../middleware/auth");
 
 const Friend = require("../models/friend");
 const User = require("../models/user");
+const Review = require("../models/review");
 
 const STATUS_VALUES = {
     PENDING: "pending",
     ACCEPTED: "accepted",
     BLOCKED: "blocked",
+    NONE: "none",
 }
 
 const userRouter = express.Router();
 
-userRouter.post("/sendFriendRequest", auth, async (req, res) => {
+userRouter.post("/createFriendRequest", auth, async (req, res) => {
     const { userId, friendId } = req.body;
 
     try {
         // Check if a friend request already exists
         const existingRequest = await Friend.findOne({
-            where: {
-                $or: [
-                    { userId: userId, friendId: friendId },
-                    { userId: friendId, friendId: userId }
-                ]
-            }
+            where: { userId: friendId, friendId: userId }
         });
 
         if (existingRequest) {
@@ -72,25 +69,107 @@ userRouter.post("/acceptFriendRequest", auth, async (req, res) => {
     }
 });
 
-// Block a friend request
-userRouter.post("/blockFriendRequest", auth, async (req, res) => {
-    const { userId, friendId } = req.body;
+// Get a friend request between two users
+userRouter.get("/getFriendRequest", auth, async (req, res) => {
+    const { userId, friendId } = req.query;
 
     try {
         const friendRequest = await Friend.findOne({
-            where: { userId: friendId, friendId: userId }
+            where: {
+                [Op.or]: [
+                    { userId: userId, friendId: friendId },
+                    { userId: friendId, friendId: userId }
+                ]
+            }
         });
 
         if (!friendRequest) {
             return res.status(404).json({ error: "Friend request not found." });
         }
 
-        friendRequest.status = "blocked";
-        await friendRequest.save();
+        res.json(friendRequest);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: "Failed to get friend request." });
+    }
+});
+
+// Block a friend request
+userRouter.post("/cancelFriendRequest", auth, async (req, res) => {
+    const { userId, friendId } = req.body;
+
+    try {
+        const friendRequest = await Friend.findOne({
+            where: {
+                [Op.or]: [
+                    { userId: userId, friendId: friendId },
+                    { userId: friendId, friendId: userId }
+                ]
+            }
+        });
+
+        if (!friendRequest) {
+            return res.status(404).json({ error: "Friend request not found." });
+        }
+
+        friendRequest.destroy();
 
         res.json(friendRequest);
     } catch (error) {
-        res.status(500).json({ error: "Failed to block friend request." });
+        console.log(error);
+        res.status(500).json({ error: "Failed to remove friend request." });
+    }
+});
+
+// Get all park IDs reviewed by user and their friends
+userRouter.get("/friendsParks", auth, async (req, res) => {
+    const { userId } = req.query;
+
+    try {
+        // Get all accepted friendships for this user
+        const friendships = await Friend.findAll({
+            where: {
+                [Op.or]: [
+                    { userId: userId, status: STATUS_VALUES.ACCEPTED },
+                    { friendId: userId, status: STATUS_VALUES.ACCEPTED }
+                ]
+            }
+        });
+
+        // Extract friend IDs
+        const friendIds = friendships.map(friendship => 
+            friendship.userId == userId ? friendship.friendId : friendship.userId
+        );
+
+        // For now not including the user's own reviews
+        // const allUserIds = [parseInt(userId), ...friendIds];
+
+        // Get all reviews from user and friends
+        const reviews = await Review.findAll({
+            where: {
+                userId: {
+                    [Op.in]: friendIds
+                }
+            },
+            attributes: ['parkId', 'favorite'],
+            distinct: true
+        });
+
+        // Extract unique park IDs
+        const parkIds = [...new Set(reviews.map(review => review.parkId))];
+        const favoriteParkIds = [...new Set(
+            reviews
+                .filter(review => review.favorite)
+                .map(review => review.parkId)
+        )];
+
+        res.json({
+            reviewedParkIds: parkIds,
+            favoriteParkIds: favoriteParkIds,
+        });
+    } catch (error) {
+        console.error('Error fetching friends parks:', error);
+        res.status(500).json({ error: "Failed to fetch friends' parks." });
     }
 });
 

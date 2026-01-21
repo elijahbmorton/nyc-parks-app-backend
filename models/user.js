@@ -45,12 +45,4 @@ User.init(
     }
 );
 
-User.sync()
-    .then(() => {
-        console.info('users table created successfully!');
-    })
-    .catch((e) => {
-        console.error('Error creating users table:', e);
-    });
-
 module.exports = User;

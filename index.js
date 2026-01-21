@@ -32,10 +32,15 @@ async function appInit() {
   app.use('/api/review', require("./routes/review"));
   app.use('/api/user', require("./routes/user"));
   app.use('/api/friend', require("./routes/friend"));
+  app.use('/api/search', require("./routes/search"));
 
   // Associations
   const associations = require('./models/associations');
   associations.createDbAssociations();
+
+  // Sync all tables
+  await db.getSequelize().sync();
+  console.log('All tables synced successfully!');
 
   // Start app
   app.listen(PORT, "0.0.0.0", async () => {

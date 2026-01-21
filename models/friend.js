@@ -40,12 +40,4 @@ Friend.init(
     }
 );
 
-Friend.sync()
-    .then(() => {
-        console.info('friends table created successfully!');
-    })
-    .catch((e) => {
-        console.error('Error creating friends table:', e);
-    });
-
 module.exports = Friend;

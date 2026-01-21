@@ -56,7 +56,7 @@ reviewsRouter.get("/reviewsFromPark", auth, async (req, res) => {
       include: [
         {
           model: User,
-          attributes: ["id", "name"],
+          attributes: ["id", "name", "profileImage", "createdAt"],
           required: true,
         },
       ],
@@ -83,6 +83,8 @@ reviewsRouter.get("/reviewsFromPark", auth, async (req, res) => {
       },
       order: [["createdAt", "DESC"]],
     });
+
+    console.log(reviews);
 
     res.json(reviews);
 });

@@ -54,8 +54,8 @@ authRouter.post("/signin", async (req, res) => {
       return res.status(400).json({ msg: "Incorrect password." });
     }
 
-    const token = jwt.sign({ id: user._id }, JWT_TOKEN_KEY);
-    res.json({ token, id: user.dataValues.id, name: user.dataValues.name });
+    const token = jwt.sign({ id: user.id }, JWT_TOKEN_KEY);
+    res.json({ ...user.dataValues, token });
   } catch (e) {
     console.log(e);
     res.status(500).json({ error: e.message });
@@ -69,7 +69,7 @@ authRouter.post("/tokenIsValid", async (req, res) => {
     const verified = jwt.verify(token, JWT_TOKEN_KEY);
     if (!verified) return res.json(false);
 
-    const user = await User.findById(verified.id);
+    const user = await User.findByPk(verified.id);
     if (!user) return res.json(false);
     res.json(true);
   } catch (e) {
@@ -79,9 +79,9 @@ authRouter.post("/tokenIsValid", async (req, res) => {
 
 // get user data
 authRouter.get("/getToken", auth, async (req, res) => {
-  const user = await User.find({ where: { id: req.user } });
-  console.log(user);
-  res.json({ ...user._doc, token: req.token });
+  const user = await User.findByPk(req.user);
+  if (!user) return res.status(404).json({ msg: "User not found" });
+  res.json({ ...user.dataValues, token: req.token });
 });
 
 module.exports = authRouter;

@@ -17,7 +17,7 @@ Review.init(
             allowNull: false,
         },
         comments: {
-            type: DataTypes.STRING,
+            type: DataTypes.TEXT,
             allowNull: true,
         },
         rating: {
@@ -45,13 +45,5 @@ Review.init(
         timestamps: false,
     }
 );
-
-Review.sync()
-    .then(() => {
-        console.info('reviews table created successfully!');
-    })
-    .catch((e) => {
-        console.error('Error creating reviews table:', e);
-    });
 
 module.exports = Review;
