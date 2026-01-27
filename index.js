@@ -43,7 +43,7 @@ async function appInit() {
   console.log('All tables synced successfully!');
 
   // Start app
-  app.listen(PORT, "0.0.0.0", async () => {
+  app.listen(PORT, "127.0.0.1", async () => {
     console.log(`connected at port ${PORT}`);
   });
 }
