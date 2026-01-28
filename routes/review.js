@@ -51,6 +51,7 @@ reviewsRouter.get("/reviewsFromPark", auth, async (req, res) => {
     const where = {};
     if (parkId) where.parkId = parkId;
 
+    // TODO: UserId is unsanitized and leaves room for SQL injection
     const reviews = await Review.findAll({
       where,
       include: [
@@ -70,9 +71,9 @@ reviewsRouter.get("/reviewsFromPark", auth, async (req, res) => {
                 WHERE f.status = 'accepted'
                     AND (
                         f.userId = ${userId}
-                        AND f.friendId = user.id
+                        AND f.friendId = User.id
                     ) OR (
-                        f.userId = user.id
+                        f.userId = User.id
                         AND f.friendId = ${userId}
                     )
               )
