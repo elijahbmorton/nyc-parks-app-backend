@@ -6,6 +6,7 @@ const auth = require("../middleware/auth");
 const Friend = require("../models/friend");
 const User = require("../models/user");
 const Review = require("../models/review");
+const { sendPushNotification } = require("../utils/notifications");
 
 const STATUS_VALUES = {
     PENDING: "pending",
@@ -40,7 +41,19 @@ userRouter.post("/createFriendRequest", auth, async (req, res) => {
             friendId,
             status: STATUS_VALUES.PENDING
         });
-        
+
+        // Send push notification to recipient
+        const sender = await User.findByPk(userId, { attributes: ["name"] });
+        const recipient = await User.findByPk(friendId, { attributes: ["deviceToken"] });
+        if (recipient?.deviceToken && sender) {
+            sendPushNotification({
+                token: recipient.deviceToken,
+                title: "New Friend Request",
+                body: `${sender.name} sent you a friend request!`,
+                data: { type: "friend_request", userId: String(userId) },
+            });
+        }
+
         res.json(friendRequest);
     } catch (error) {
         res.status(500).json({ error: "Failed to send friend request." });
@@ -62,6 +75,18 @@ userRouter.post("/acceptFriendRequest", auth, async (req, res) => {
 
         friendRequest.status = STATUS_VALUES.ACCEPTED;
         await friendRequest.save();
+
+        // Notify the original sender that their request was accepted
+        const accepter = await User.findByPk(userId, { attributes: ["name"] });
+        const originalSender = await User.findByPk(friendId, { attributes: ["deviceToken"] });
+        if (originalSender?.deviceToken && accepter) {
+            sendPushNotification({
+                token: originalSender.deviceToken,
+                title: "Friend Request Accepted",
+                body: `${accepter.name} accepted your friend request!`,
+                data: { type: "friend_accepted", userId: String(userId) },
+            });
+        }
 
         res.json(friendRequest);
     } catch (error) {

@@ -7,12 +7,13 @@ const Review = require("../models/review");
 const { Op, literal } = require('sequelize');
 const Friend = require("../models/friend");
 const { containsObjectionableContent } = require("../utils/contentFilter");
+const { sendPushToMultiple } = require("../utils/notifications");
 
 // Add or update a review
 reviewsRouter.post("/addReview", auth, async (req, res) => {
     try {
         const userId = req.user;
-        let { review } = req.body;
+        let { review, parkName } = req.body;
         review = JSON.parse(review);
 
         if (!review.parkId) {
@@ -41,6 +42,36 @@ reviewsRouter.post("/addReview", auth, async (req, res) => {
             userId: userId,
         });
         await review.save();
+
+        // Notify all friends that the user posted a review
+        const author = await User.findByPk(userId, { attributes: ["name"] });
+        if (author) {
+            const friendships = await Friend.findAll({
+                where: {
+                    [Op.or]: [
+                        { userId: userId, status: "accepted" },
+                        { friendId: userId, status: "accepted" },
+                    ],
+                },
+            });
+            const friendIds = friendships.map((f) =>
+                f.userId == userId ? f.friendId : f.userId
+            );
+            if (friendIds.length > 0) {
+                const friends = await User.findAll({
+                    where: { id: { [Op.in]: friendIds } },
+                    attributes: ["deviceToken"],
+                });
+                const tokens = friends.map((f) => f.deviceToken).filter(Boolean);
+                const displayName = parkName || "a park";
+                sendPushToMultiple({
+                    tokens,
+                    title: "New Park Review",
+                    body: `${author.name} posted a review of ${displayName}!`,
+                    data: { type: "new_review", parkId: review.parkId },
+                });
+            }
+        }
 
         res.json(review);
     } catch (e) {

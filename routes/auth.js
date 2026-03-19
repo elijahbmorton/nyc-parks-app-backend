@@ -48,7 +48,7 @@ authRouter.post("/signup", async (req, res) => {
 // Sign In
 authRouter.post("/signin", async (req, res) => {
   try {
-    let { email, password } = req.body;
+    let { email, password, deviceToken } = req.body;
     email = email.toLowerCase();
 
     const user = await User.findOne({ where: { email: email } });
@@ -63,8 +63,46 @@ authRouter.post("/signin", async (req, res) => {
       return res.status(400).json({ msg: "Incorrect password." });
     }
 
+    // Save device token for push notifications
+    if (deviceToken) {
+      // Clear this token from any other user first (prevents stale cross-user tokens)
+      await User.update(
+        { deviceToken: null },
+        { where: { deviceToken: deviceToken } }
+      );
+      user.deviceToken = deviceToken;
+      await user.save();
+    }
+
     const token = jwt.sign({ id: user.id }, JWT_TOKEN_KEY);
     res.json({ ...user.dataValues, token });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Update device token (for token refresh)
+authRouter.post("/updateDeviceToken", auth, async (req, res) => {
+  try {
+    const { deviceToken } = req.body;
+    if (!deviceToken) {
+      return res.status(400).json({ msg: "Device token required" });
+    }
+
+    // Clear from any other user
+    await User.update(
+      { deviceToken: null },
+      { where: { deviceToken: deviceToken } }
+    );
+
+    const user = await User.findByPk(req.user);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    user.deviceToken = deviceToken;
+    await user.save();
+
+    res.json({ msg: "Device token updated" });
   } catch (e) {
     console.log(e);
     res.status(500).json({ error: e.message });

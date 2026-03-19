@@ -41,6 +41,11 @@ User.init(
             allowNull: false,
             defaultValue: false,
         },
+        deviceToken: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            defaultValue: null,
+        },
     },
     {
         sequelize,
