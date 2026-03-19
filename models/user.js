@@ -36,6 +36,11 @@ User.init(
             allowNull: false,
             defaultValue: Sequelize.NOW,
         },
+        agreedToTerms: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
     },
     {
         sequelize,

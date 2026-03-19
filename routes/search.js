@@ -181,7 +181,7 @@ const filterSearchResults = (searchWords, searchResults, loggedInUserId) => {
     return searchResults;
 }
 
-searchRouter.get("/", fakeMiddleware, async (req, res) => {
+searchRouter.get("/", async (req, res) => {
     try {
         const { query, loggedInUserId } = req.query;
 

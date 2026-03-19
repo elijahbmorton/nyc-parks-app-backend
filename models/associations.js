@@ -2,6 +2,7 @@ const Review = require("./review");
 const User = require("./user");
 const Friend = require("./friend");
 const Park = require("./park");
+const Report = require("./report");
 
 function createDbAssociations() {
     // User - Review
@@ -15,6 +16,12 @@ function createDbAssociations() {
     // Park - Review
     Park.hasMany(Review, { foreignKey: 'parkId', sourceKey: 'GlobalID' });
     Review.belongsTo(Park, { foreignKey: 'parkId', targetKey: 'GlobalID' });
+    // User - Report
+    Report.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter' });
+    User.hasMany(Report, { foreignKey: 'reporterId' });
+    // Review - Report
+    Report.belongsTo(Review, { foreignKey: 'reviewId' });
+    Review.hasMany(Report, { foreignKey: 'reviewId' });
 }
 
 module.exports = {

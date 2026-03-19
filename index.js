@@ -33,13 +33,14 @@ async function appInit() {
   app.use('/api/user', require("./routes/user"));
   app.use('/api/friend', require("./routes/friend"));
   app.use('/api/search', require("./routes/search"));
+  app.use('/api/report', require("./routes/report"));
 
   // Associations
   const associations = require('./models/associations');
   associations.createDbAssociations();
 
   // Sync all tables
-  await db.getSequelize().sync();
+  await db.getSequelize().sync({ alter: true });
   console.log('All tables synced successfully!');
 
   // Start app

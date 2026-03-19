@@ -4,14 +4,22 @@ const User = require("../models/user");
 const authRouter = express.Router();
 const jwt = require("jsonwebtoken");
 const auth = require("../middleware/auth");
-const { where } = require("sequelize");
+const { Op } = require("sequelize");
+const Review = require("../models/review");
+const Friend = require("../models/friend");
+const Report = require("../models/report");
 
 const JWT_TOKEN_KEY = process.env.JWT_TOKEN_KEY;
 
 // Sign Up
 authRouter.post("/signup", async (req, res) => {
   try {
-    let { name, email, password } = req.body;
+    let { name, email, password, agreedToTerms } = req.body;
+
+    if (!agreedToTerms) {
+      return res.status(400).json({ msg: "You must agree to the Terms of Service." });
+    }
+
     email = email.toLowerCase();
 
     const existingUser = await User.findOne({ where: { email: email } });
@@ -27,6 +35,7 @@ authRouter.post("/signup", async (req, res) => {
       email,
       password: hashedPassword,
       name,
+      agreedToTerms: true,
     });
     user = await user.save();
     res.json(user);
@@ -82,6 +91,31 @@ authRouter.get("/getToken", auth, async (req, res) => {
   const user = await User.findByPk(req.user);
   if (!user) return res.status(404).json({ msg: "User not found" });
   res.json({ ...user.dataValues, token: req.token });
+});
+
+// Delete account
+authRouter.delete("/deleteAccount", auth, async (req, res) => {
+  try {
+    const userId = req.user;
+
+    // Delete in order of foreign key dependencies
+    await Report.destroy({ where: { reporterId: userId } });
+    await Review.destroy({ where: { userId: userId } });
+    await Friend.destroy({
+      where: {
+        [Op.or]: [
+          { userId: userId },
+          { friendId: userId },
+        ]
+      }
+    });
+    await User.destroy({ where: { id: userId } });
+
+    res.json({ message: "Account deleted successfully." });
+  } catch (e) {
+    console.error("Error deleting account:", e);
+    res.status(500).json({ error: "Failed to delete account." });
+  }
 });
 
 module.exports = authRouter;

@@ -1,32 +1,35 @@
 const express = require("express");
-const bcryptjs = require("bcryptjs");
 const User = require("../models/user");
 const reviewsRouter = express.Router();
-const jwt = require("jsonwebtoken");
 const auth = require("../middleware/auth");
-const { where } = require("sequelize");
+const optionalAuth = require("../middleware/optionalAuth");
 const Review = require("../models/review");
 const { Op, literal } = require('sequelize');
 const Friend = require("../models/friend");
+const { containsObjectionableContent } = require("../utils/contentFilter");
 
-// Sign Up
-reviewsRouter.post("/addReview", async (req, res) => {
+// Add or update a review
+reviewsRouter.post("/addReview", auth, async (req, res) => {
     try {
-        // TODO: Validate that the user passed is the logged in user
-        let { review, userId } = req.body;
+        const userId = req.user;
+        let { review } = req.body;
         review = JSON.parse(review);
-        console.log(review)
 
-        if (!review.parkId || !userId) {
+        if (!review.parkId) {
             return res
                 .status(400)
-                .json({ msg: "Review or user not provided!" });
+                .json({ msg: "Park ID not provided!" });
+        }
+
+        // Content filter
+        if (containsObjectionableContent(review.comments)) {
+            return res.status(400).json({
+                msg: "Your review contains language that violates our community guidelines. Please revise and try again."
+            });
         }
 
         const existingReview = await Review.findOne({ where: { parkId: review.parkId, userId: userId } });
         if (existingReview) {
-            // TODO: figure out what to do here
-            // For now I'm just gonna delete their existing review and make a new one
             await Review.destroy({ where: { parkId: review.parkId, userId: userId } });
         }
 
@@ -37,7 +40,7 @@ reviewsRouter.post("/addReview", async (req, res) => {
             favorite: review.favorite,
             userId: userId,
         });
-        review.save();
+        await review.save();
 
         res.json(review);
     } catch (e) {
@@ -45,49 +48,79 @@ reviewsRouter.post("/addReview", async (req, res) => {
     }
 });
 
-reviewsRouter.get("/reviewsFromPark", auth, async (req, res) => {
-    let { parkId, userId } = req.query;
+// Get reviews for a park (public - optionalAuth for friend status)
+reviewsRouter.get("/reviewsFromPark", optionalAuth, async (req, res) => {
+    try {
+        let { parkId } = req.query;
+        const userId = req.user; // From optionalAuth; may be undefined for guests
 
-    const where = {};
-    if (parkId) where.parkId = parkId;
+        const where = {};
+        if (parkId) where.parkId = parkId;
 
-    // TODO: UserId is unsanitized and leaves room for SQL injection
-    const reviews = await Review.findAll({
-      where,
-      include: [
-        {
-          model: User,
-          attributes: ["id", "name", "profileImage", "createdAt"],
-          required: true,
-        },
-      ],
-      attributes: {
-        include: [
-          [
-            literal(`
-              EXISTS (
-                SELECT 1
-                FROM friends f
-                WHERE f.status = 'accepted'
-                    AND (
-                        f.userId = ${userId}
-                        AND f.friendId = User.id
-                    ) OR (
-                        f.userId = User.id
-                        AND f.friendId = ${userId}
-                    )
-              )
-            `),
-            "friendsWithActiveUser",
+        // Build attributes - only include friend subquery if authenticated
+        const attributes = {};
+        if (userId) {
+            const safeUserId = parseInt(userId, 10);
+            if (isNaN(safeUserId)) {
+                return res.status(400).json({ error: "Invalid user" });
+            }
+            attributes.include = [
+                [
+                    literal(`
+                      EXISTS (
+                        SELECT 1
+                        FROM friends f
+                        WHERE f.status = 'accepted'
+                            AND (
+                                (f.userId = ${safeUserId} AND f.friendId = \`User\`.id)
+                                OR (f.userId = \`User\`.id AND f.friendId = ${safeUserId})
+                            )
+                      )
+                    `),
+                    "friendsWithActiveUser",
+                ],
+            ];
+        }
+
+        const reviews = await Review.findAll({
+          where,
+          include: [
+            {
+              model: User,
+              attributes: ["id", "name", "profileImage", "createdAt"],
+              required: true,
+            },
           ],
-        ],
-      },
-      order: [["createdAt", "DESC"]],
-    });
+          attributes,
+          order: [["createdAt", "DESC"]],
+        });
 
-    console.log(reviews);
+        // If authenticated, filter out reviews from blocked users
+        if (userId) {
+            const blockedRelationships = await Friend.findAll({
+                where: {
+                    status: 'blocked',
+                    [Op.or]: [
+                        { userId: userId },
+                        { friendId: userId },
+                    ]
+                }
+            });
+            const blockedUserIds = blockedRelationships.map(f =>
+                f.userId === userId ? f.friendId : f.userId
+            );
 
-    res.json(reviews);
+            if (blockedUserIds.length > 0) {
+                const filteredReviews = reviews.filter(r => !blockedUserIds.includes(r.userId));
+                return res.json(filteredReviews);
+            }
+        }
+
+        res.json(reviews);
+    } catch (e) {
+        console.error("Error fetching reviews:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 module.exports = reviewsRouter;
