@@ -2,9 +2,10 @@ const admin = require("./firebase");
 const User = require("../models/user");
 
 async function sendPushNotification({ token, title, body, data = {} }) {
-    if (!token) return;
+    if (!token) { console.log("Push skipped: no token"); return; }
+    console.log("Sending push:", { title, body, tokenPrefix: token.substring(0, 20) });
     try {
-        await admin.messaging().send({
+        const result = await admin.messaging().send({
             token,
             notification: { title, body },
             data,
@@ -14,6 +15,7 @@ async function sendPushNotification({ token, title, body, data = {} }) {
                 },
             },
         });
+        console.log("Push sent successfully:", result);
     } catch (e) {
         console.error("Failed to send push notification:", e.message);
         // Clear invalid tokens

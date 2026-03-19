@@ -45,6 +45,7 @@ userRouter.post("/createFriendRequest", auth, async (req, res) => {
         // Send push notification to recipient
         const sender = await User.findByPk(userId, { attributes: ["name"] });
         const recipient = await User.findByPk(friendId, { attributes: ["deviceToken"] });
+        console.log("Push debug:", { senderId: userId, recipientId: friendId, senderName: sender?.name, hasToken: !!recipient?.deviceToken });
         if (recipient?.deviceToken && sender) {
             sendPushNotification({
                 token: recipient.deviceToken,
